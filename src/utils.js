@@ -5,6 +5,8 @@ const AUTH_KEY = 'english-from-zero-auth'
 // 每个用户一份学习记录，保存在服务器上（见 progress-api.js），浏览器 localStorage 里按用户名留一份缓存，
 // 这样换窗口、换浏览器、清缓存，登录同一个账号都能接着学
 const localKey = name => `${KEY}:${name.toLowerCase()}`
+// 接口地址：默认和页面同域名（/api/...）；接口单独部署在别的域名时，打包前在 .env.production 里写 VITE_API_BASE
+const API = (import.meta.env.VITE_API_BASE || '').replace(/\/$/, '')
 
 export function loadAuth() {
   try { return JSON.parse(localStorage.getItem(AUTH_KEY)) } catch { return null }
@@ -14,7 +16,7 @@ export function loadAuth() {
 export async function signIn(mode, name, password) {
   let r, data
   try {
-    r = await fetch(`/api/${mode}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, password }) })
+    r = await fetch(`${API}/api/${mode}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, password }) })
     data = await r.json()
   } catch { throw new Error('连不上服务器，请稍后再试') }
   if (!r.ok) throw new Error(data.error || '出错了，请重试')
@@ -28,7 +30,7 @@ export async function signIn(mode, name, password) {
 
 export function signOut(auth) {
   localStorage.removeItem(AUTH_KEY)
-  fetch('/api/logout', { method: 'POST', headers: { Authorization: `Bearer ${auth.token}` } }).catch(() => {})
+  fetch(`${API}/api/logout`, { method: 'POST', headers: { Authorization: `Bearer ${auth.token}` } }).catch(() => {})
 }
 
 function loadProgress(name) {
@@ -49,7 +51,7 @@ export function useProgress(auth, onExpired) {
   // 启动时取服务器上的记录，哪边更新用哪边
   useEffect(() => {
     let cancelled = false
-    fetch('/api/progress', { headers })
+    fetch(`${API}/api/progress`, { headers })
       .then(r => {
         if (r.status === 401) { if (!cancelled) onExpired(); return null }
         return r.ok ? r.json() : null
@@ -68,7 +70,7 @@ export function useProgress(auth, onExpired) {
     if (!ready) return // 服务器记录还没取回前不上传，避免空记录覆盖
     clearTimeout(timer.current)
     timer.current = setTimeout(() => {
-      fetch('/api/progress', { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(progress) })
+      fetch(`${API}/api/progress`, { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(progress) })
         .then(r => { if (r.status === 401) onExpired() })
         .catch(() => {})
     }, 400)
